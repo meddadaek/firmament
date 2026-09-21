@@ -1,10 +1,11 @@
 import { Html } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BoxGeometry,
   CapsuleGeometry,
   CylinderGeometry,
+  DodecahedronGeometry,
   DoubleSide,
   Group,
   IcosahedronGeometry,
@@ -14,11 +15,12 @@ import {
   RingGeometry,
   SphereGeometry,
   TorusGeometry,
+  Vector3,
 } from 'three'
-import { sim } from '@/state/sim'
+import { live } from '@/net/engine'
+import { poses, sim } from '@/state/sim'
 import { useGame } from '@/state/store'
 import type { AgentDef } from './roster'
-import type { Walker } from './walker'
 
 /* Shared geometry — built once, reused by all six characters. */
 const G = {
@@ -61,6 +63,15 @@ const G = {
   holo: new IcosahedronGeometry(0.045, 0),
   ring: new RingGeometry(0.21, 0.255, 44),
   hitbox: new CylinderGeometry(0.22, 0.22, 0.75, 8),
+  // What they carry and hold
+  log: new CylinderGeometry(0.035, 0.035, 0.24, 6).rotateZ(Math.PI / 2),
+  stone: new DodecahedronGeometry(0.065, 0),
+  berry: new SphereGeometry(0.03, 6, 5),
+  basket: new CylinderGeometry(0.07, 0.055, 0.06, 8),
+  toolHandle: new CylinderGeometry(0.01, 0.01, 0.22, 5).translate(0, -0.11, 0),
+  toolAxe: new BoxGeometry(0.06, 0.045, 0.012).translate(0.025, -0.2, 0),
+  toolPick: new BoxGeometry(0.14, 0.02, 0.02).translate(0, -0.21, 0),
+  toolHammer: new BoxGeometry(0.07, 0.04, 0.04).translate(0, -0.2, 0),
 }
 
 const M = {
@@ -85,17 +96,21 @@ const M = {
   beanie: new MeshStandardMaterial({ color: '#c0392b', roughness: 0.9 }),
   beanieBand: new MeshStandardMaterial({ color: '#a93226', roughness: 0.9 }),
   pompom: new MeshStandardMaterial({ color: '#f4efe6', roughness: 1 }),
+  log: new MeshStandardMaterial({ color: '#8a5a36', roughness: 0.9, flatShading: true }),
+  stone: new MeshStandardMaterial({ color: '#a3a7b3', roughness: 0.9, flatShading: true }),
+  berry: new MeshStandardMaterial({ color: '#e0364f', roughness: 0.4 }),
+  basket: new MeshStandardMaterial({ color: '#c8a064', roughness: 0.9 }),
 }
 
 const std = (color: string, roughness = 0.75) => new MeshStandardMaterial({ color, roughness })
+const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
+const target = new Vector3()
+const before = new Vector3()
 
-interface Props {
-  def: AgentDef
-  walker: Walker
-  seed: number
-}
+type Carry = 'wood' | 'stone' | 'food'
+type Tool = 'axe' | 'pick' | 'hammer'
 
-export function Character({ def, walker, seed }: Props) {
+export function Character({ def, seed }: { def: AgentDef; seed: number }) {
   const root = useRef<Group>(null)
   const body = useRef<Group>(null)
   const head = useRef<Group>(null)
@@ -105,7 +120,17 @@ export function Character({ def, walker, seed }: Props) {
   const armR = useRef<Group>(null)
   const ring = useRef<Mesh>(null)
   const holo = useRef<Mesh>(null)
-  const anim = useRef({ phase: seed, walk: 0, rest: 0, idle: seed * 3 })
+  const carry = useRef<Record<Carry, Group | null>>({ wood: null, stone: null, food: null })
+  const tools = useRef<Record<Tool, Group | null>>({ axe: null, pick: null, hammer: null })
+  const anim = useRef({ phase: seed, walk: 0, rest: 0, work: 0, eat: 0, idle: seed * 3, t: 0, init: false, yaw: 0 })
+  const pose = useMemo(() => ({ position: new Vector3() }), [])
+
+  useEffect(() => {
+    poses.set(def.id, pose)
+    return () => {
+      poses.delete(def.id)
+    }
+  }, [def.id, pose])
 
   const mat = useMemo(
     () => ({
@@ -121,33 +146,65 @@ export function Character({ def, walker, seed }: Props) {
   const toggleSelect = useGame((s) => s.toggleSelect)
   const hover = useGame((s) => s.hover)
 
-  useFrame(({ clock }) => {
-    const dt = sim.dt
+  useFrame(({ clock }, delta) => {
+    const s = live.agents.get(def.id)
     const a = anim.current
     const g = root.current
-    if (!g || !body.current || !head.current || !legL.current || !legR.current || !armL.current || !armR.current) return
+    if (!s || !g || !body.current || !head.current || !legL.current || !legR.current || !armL.current || !armR.current) return
+    const real = Math.min(delta, 0.1)
+    const dt = sim.dt
 
-    g.position.copy(walker.position)
-    g.rotation.y = walker.yaw
+    // Engine positions arrive ~10 times a second; ease toward them so motion stays fluid.
+    target.set(s.x, s.y, s.z)
+    if (!a.init || pose.position.distanceTo(target) > 4) {
+      pose.position.copy(target)
+      a.yaw = s.yaw
+      a.init = true
+    }
+    before.copy(pose.position)
+    pose.position.lerp(target, 1 - Math.exp(-12 * real))
+    a.yaw += wrapAngle(s.yaw - a.yaw) * (1 - Math.exp(-10 * real))
+    g.position.copy(pose.position)
+    g.rotation.y = a.yaw
+    g.visible = !s.hidden
 
-    const k = 1 - Math.exp(-7 * dt)
-    a.walk += ((walker.mode === 'walk' ? 1 : 0) - a.walk) * k
-    a.rest += ((walker.mode === 'rest' ? 1 : 0) - a.rest) * k
-    a.phase += dt * 9.5 * a.walk
+    const k = 1 - Math.exp(-8 * real)
+    const hauling = s.carry !== null ? 1 : 0
+    a.walk += ((s.act === 'walk' ? 1 : 0) - a.walk) * k
+    a.rest += ((s.act === 'sleep' ? 1 : 0) - a.rest) * k
+    a.work += ((s.act === 'work' ? 1 : 0) - a.work) * k
+    a.eat += ((s.act === 'eat' ? 1 : 0) - a.eat) * k
+    a.phase += before.distanceTo(pose.position) * 7.5 // stride follows real distance covered
+    a.t += dt
     a.idle += dt
 
     const swing = Math.sin(a.phase) * 0.7 * a.walk
     const stand = 1 - a.rest
     legL.current.rotation.x = swing * stand - 1.4 * a.rest
     legR.current.rotation.x = -swing * stand - 1.4 * a.rest
-    armL.current.rotation.x = -swing * 0.85 - 0.55 * a.rest
-    armR.current.rotation.x = swing * 0.85 - 0.55 * a.rest
+
+    // Arms: swing while walking, forward while hauling, an arc while chopping/mining/building, hand to mouth while eating.
+    const hit = (Math.sin(a.t * 9) * 0.5 + 0.5) * a.work
+    armL.current.rotation.x = -swing * 0.85 * (1 - hauling) - 0.95 * hauling - 0.55 * a.rest - hit * 1.4 - a.eat * 0.4
+    armR.current.rotation.x =
+      swing * 0.85 * (1 - hauling) - 0.95 * hauling - 0.55 * a.rest - hit * 1.9 - a.eat * (2.1 + Math.sin(a.t * 6) * 0.2)
 
     const breathe = Math.sin(a.idle * 2.1) * 0.006 * (1 - a.walk)
     body.current.position.y = Math.abs(Math.cos(a.phase)) * 0.026 * a.walk - a.rest * 0.125 + breathe
-    body.current.rotation.x = 0.09 * a.walk
-    head.current.rotation.y = Math.sin(a.idle * 0.55) * 0.4 * (1 - a.walk)
-    head.current.rotation.x = Math.sin(a.idle * 0.8) * 0.05 + a.rest * 0.12
+    body.current.rotation.x = 0.09 * a.walk + 0.1 * a.work * Math.sin(a.t * 9)
+    head.current.rotation.y = Math.sin(a.idle * 0.55) * 0.4 * (1 - a.walk) * (1 - a.work)
+    head.current.rotation.x = Math.sin(a.idle * 0.8) * 0.05 + a.rest * 0.12 + a.work * 0.15
+
+    for (const kind of ['wood', 'stone', 'food'] as const) {
+      const c = carry.current[kind]
+      if (c) c.visible = s.carry?.[0] === kind
+    }
+    const tool: Tool | null =
+      s.act !== 'work' ? null : s.label.includes('chop') ? 'axe' : s.label.includes('mining') ? 'pick' : s.task === 'build' || s.task === 'craft' ? 'hammer' : null
+    for (const kind of ['axe', 'pick', 'hammer'] as const) {
+      const t = tools.current[kind]
+      if (t) t.visible = tool === kind
+    }
 
     if (holo.current) {
       holo.current.rotation.y += dt * 1.6
@@ -157,10 +214,9 @@ export function Character({ def, walker, seed }: Props) {
     if (ring.current) {
       const { selectedId, hoveredId } = useGame.getState()
       const selected = selectedId === def.id
-      const target = selected ? 0.95 : hoveredId === def.id ? 0.7 : 0.18 * sim.night
-      mat.ring.opacity += (target - mat.ring.opacity) * 0.15
-      const pulse = selected ? 1 + Math.sin(clock.elapsedTime * 4) * 0.06 : 1
-      ring.current.scale.setScalar(pulse)
+      const goal = selected ? 0.95 : hoveredId === def.id ? 0.7 : 0.18 * sim.night
+      mat.ring.opacity += (goal - mat.ring.opacity) * 0.15
+      ring.current.scale.setScalar(selected ? 1 + Math.sin(clock.elapsedTime * 4) * 0.06 : 1)
     }
   })
 
@@ -182,14 +238,7 @@ export function Character({ def, walker, seed }: Props) {
 
   return (
     <group ref={root}>
-      <mesh
-        geometry={G.hitbox}
-        material={M.hitbox}
-        position={[0, 0.37, 0]}
-        onPointerOver={onOver}
-        onPointerOut={onOut}
-        onClick={onClick}
-      />
+      <mesh geometry={G.hitbox} material={M.hitbox} position={[0, 0.37, 0]} onPointerOver={onOver} onPointerOut={onOut} onClick={onClick} />
       <mesh ref={ring} geometry={G.ring} material={mat.ring} rotation-x={-Math.PI / 2} position-y={0.015} />
 
       <group ref={body}>
@@ -205,10 +254,44 @@ export function Character({ def, walker, seed }: Props) {
         {female && <mesh geometry={G.dress} material={mat.shirt} position-y={0.205} castShadow />}
         {def.look === 'hardhat' && <mesh geometry={G.belt} material={M.leather} position-y={0.2} rotation-x={Math.PI / 2} />}
 
+        {/* What they are hauling back to the crate. */}
+        <group position={[0, 0.3, 0.14]}>
+          <group ref={(el) => void (carry.current.wood = el)} visible={false}>
+            <mesh geometry={G.log} material={M.log} position-y={0.02} castShadow />
+            <mesh geometry={G.log} material={M.log} position-y={0.07} castShadow />
+          </group>
+          <group ref={(el) => void (carry.current.stone = el)} visible={false}>
+            <mesh geometry={G.stone} material={M.stone} position={[-0.04, 0.03, 0]} castShadow />
+            <mesh geometry={G.stone} material={M.stone} position={[0.05, 0.05, 0.01]} scale={0.8} castShadow />
+          </group>
+          <group ref={(el) => void (carry.current.food = el)} visible={false}>
+            <mesh geometry={G.basket} material={M.basket} position-y={0.02} />
+            <mesh geometry={G.berry} material={M.berry} position={[-0.025, 0.06, 0]} />
+            <mesh geometry={G.berry} material={M.berry} position={[0.03, 0.06, 0.01]} />
+            <mesh geometry={G.berry} material={M.berry} position={[0, 0.07, -0.02]} />
+          </group>
+        </group>
+
         {[-1, 1].map((side) => (
           <group key={side} ref={side < 0 ? armL : armR} position={[side * 0.118, 0.372, 0]} rotation-z={side * 0.14}>
             <mesh geometry={G.arm} material={mat.shirt} position-y={-0.072} castShadow />
             <mesh geometry={G.hand} material={mat.skin} position-y={-0.152} />
+            {side > 0 && (
+              <group position-y={-0.14} rotation-x={Math.PI / 2}>
+                <group ref={(el) => void (tools.current.axe = el)} visible={false}>
+                  <mesh geometry={G.toolHandle} material={M.wood} />
+                  <mesh geometry={G.toolAxe} material={M.metal} />
+                </group>
+                <group ref={(el) => void (tools.current.pick = el)} visible={false}>
+                  <mesh geometry={G.toolHandle} material={M.wood} />
+                  <mesh geometry={G.toolPick} material={M.metal} />
+                </group>
+                <group ref={(el) => void (tools.current.hammer = el)} visible={false}>
+                  <mesh geometry={G.toolHandle} material={M.wood} />
+                  <mesh geometry={G.toolHammer} material={M.metal} />
+                </group>
+              </group>
+            )}
             {def.look === 'ponytail' && side > 0 && (
               <group position={[0, -0.17, 0.05]} rotation-x={-1.05}>
                 <mesh geometry={G.tablet} material={M.tabletBody} />
@@ -242,9 +325,7 @@ export function Character({ def, walker, seed }: Props) {
               <mesh geometry={G.blush} material={M.blush} position={[side * 0.073, -0.03, 0.098]} scale={[1, 0.6, 0.35]} />
             </group>
           ))}
-          {def.look !== 'beanie-beard' && (
-            <mesh geometry={G.mouth} material={M.mouth} position={[0, -0.045, 0.121]} rotation-z={Math.PI} />
-          )}
+          {def.look !== 'beanie-beard' && <mesh geometry={G.mouth} material={M.mouth} position={[0, -0.045, 0.121]} rotation-z={Math.PI} />}
           <Hair def={def} hair={mat.hair} shirt={mat.shirt} />
         </group>
       </group>
@@ -351,21 +432,52 @@ function Hair({ def, hair, shirt }: { def: AgentDef; hair: MeshStandardMaterial;
   }
 }
 
-const ACTIVITY_LABEL = { idle: 'idle', walking: 'exploring', resting: 'resting' } as const
+const BUBBLE_MS = 5200
 
+/** Name, what they are doing right now, and a speech bubble when they say something in the chat. */
 function NameTag({ def }: { def: AgentDef }) {
-  const activity = useGame((s) => s.activity[def.id] ?? 'idle')
+  const label = useGame((s) => s.agents[def.id]?.label ?? 'idle')
+  const hidden = useGame((s) => s.agents[def.id]?.hidden ?? false)
   const focused = useGame((s) => s.selectedId === def.id || s.hoveredId === def.id)
+  const lastLine = useGame((s) => {
+    for (let i = s.chat.length - 1; i >= 0; i--) if (s.chat[i].from === def.id) return s.chat[i]
+    return null
+  })
+  const [bubble, setBubble] = useState<string | null>(null)
+  const firstSeen = useRef<number | null>(null)
 
+  // Only lines that arrive while watching pop a bubble; history loaded on connect does not.
+  useEffect(() => {
+    if (!lastLine) return
+    if (firstSeen.current === null) {
+      firstSeen.current = lastLine.id
+      return
+    }
+    setBubble(lastLine.text)
+    const t = setTimeout(() => setBubble(null), BUBBLE_MS)
+    return () => clearTimeout(t)
+  }, [lastLine])
+
+  if (hidden) return null
   return (
     <Html position={[0, 0.98, 0]} center distanceFactor={9} zIndexRange={[8, 0]} style={{ pointerEvents: 'none' }}>
-      <div
-        className="tag-pill flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] leading-none font-semibold whitespace-nowrap text-white transition-transform duration-300"
-        style={{ transform: `scale(${focused ? 1.12 : 1})`, boxShadow: focused ? `0 0 0 1px ${def.color}, 0 0 18px ${def.color}66` : undefined }}
-      >
-        <span className="h-2 w-2 rounded-full" style={{ background: def.color, boxShadow: `0 0 8px ${def.color}` }} />
-        {def.name}
-        <span className="font-medium text-white/55">{focused ? def.role : ACTIVITY_LABEL[activity]}</span>
+      <div className="flex flex-col items-center gap-1">
+        {bubble && (
+          <div
+            className="max-w-[220px] rounded-2xl rounded-bl-sm bg-white px-3 py-1.5 text-center text-[12px] leading-snug font-semibold text-[#141a33]"
+            style={{ boxShadow: `0 8px 26px -8px ${def.color}`, animation: 'bubble-in 260ms ease-out' }}
+          >
+            {bubble}
+          </div>
+        )}
+        <div
+          className="tag-pill flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] leading-none font-semibold whitespace-nowrap text-white transition-transform duration-300"
+          style={{ transform: `scale(${focused ? 1.12 : 1})`, boxShadow: focused ? `0 0 0 1px ${def.color}, 0 0 18px ${def.color}66` : undefined }}
+        >
+          <span className="h-2 w-2 rounded-full" style={{ background: def.color, boxShadow: `0 0 8px ${def.color}` }} />
+          {def.name}
+          <span className="font-medium text-white/60">{focused ? def.role : label}</span>
+        </div>
       </div>
     </Html>
   )

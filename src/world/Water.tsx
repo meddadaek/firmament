@@ -3,7 +3,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, CylinderGeometry, DoubleSide, InstancedMesh, Object3D, PlaneGeometry, ShaderMaterial } from 'three'
 import { sim } from '@/state/sim'
 import { tod } from './timeOfDay'
-import { WATER_SURFACE, WORLD } from './generate'
+import type { WorldData } from '@/net/types'
 
 const surfaceGeo = new CylinderGeometry(1, 1, 0.05, 6).translate(0, -0.025, 0)
 
@@ -75,9 +75,9 @@ const fallMat = new ShaderMaterial({
     }`,
 })
 
-export function Water() {
+export function Water({ world }: { world: WorldData }) {
   const ref = useRef<InstancedMesh>(null)
-  const waterTiles = useMemo(() => WORLD.tiles.filter((t) => t.biome === 'water'), [])
+  const waterTiles = useMemo(() => world.tiles.filter((t) => t.biome === 'water'), [world])
 
   const fallGeo = useMemo(() => {
     const g = new PlaneGeometry(0.9, FALL, 1, 28)
@@ -94,13 +94,13 @@ export function Water() {
   useLayoutEffect(() => {
     const o = new Object3D()
     waterTiles.forEach((t, i) => {
-      o.position.set(t.x, WATER_SURFACE, t.z)
+      o.position.set(t.x, world.waterSurface, t.z)
       o.updateMatrix()
       ref.current!.setMatrixAt(i, o.matrix)
     })
     ref.current!.instanceMatrix.needsUpdate = true
     ref.current!.computeBoundingSphere()
-  }, [waterTiles])
+  }, [waterTiles, world])
 
   useFrame(({ clock }) => {
     common.uTime.value = clock.elapsedTime
@@ -108,7 +108,7 @@ export function Water() {
     common.uSky.value.copy(tod.skyTop)
   })
 
-  const wf = WORLD.waterfall
+  const wf = world.waterfall
   return (
     <group>
       <instancedMesh ref={ref} args={[surfaceGeo, surfaceMat, waterTiles.length]} />

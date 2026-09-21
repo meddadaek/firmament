@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "engine": "node engine/run.mjs",
+    "test:engine": "node engine/run.mjs --test"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",

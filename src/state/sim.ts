@@ -1,6 +1,7 @@
 import { Vector3 } from 'three'
+import { live } from '@/net/engine'
 
-/** Real seconds for one in-game day at 1× speed. */
+/** Real seconds for one in-game day at 1× speed (mirrors the engine's DAY_SECONDS). */
 export const DAY_SECONDS = 240
 
 const smoothstep = (a: number, b: number, x: number) => {
@@ -8,42 +9,42 @@ const smoothstep = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t)
 }
 
+const wrap = (t: number) => ((t % 1) + 1) % 1
+
 /**
- * Per-frame simulation state. Lives outside React on purpose: it changes every
- * frame, and putting it in React state would re-render the whole tree at 60 Hz.
+ * Per-frame clock. The engine is the authority; between its 10 Hz updates the clock is
+ * extrapolated locally and gently pulled back toward the server so the sky never jumps.
  */
 export const sim = {
-  /** Day progress, 0 = midnight, 0.5 = noon. */
   t: 0.3,
   day: 1,
-  /** 0 in daylight → 1 in deep night. */
   night: 0,
-  /** Unit vector toward the sun (below the horizon at night). */
   sunDir: new Vector3(),
   /** Scaled delta of the current frame (0 while paused). */
   dt: 0,
 }
 
-export function advance(realDt: number, speed: number) {
-  const dt = Math.min(realDt, 0.1) * speed
+export function advance(realDt: number) {
+  const dt = Math.min(realDt, 0.1) * live.speed
   sim.dt = dt
-  sim.t += dt / DAY_SECONDS
-  if (sim.t >= 1) {
-    sim.t -= 1
-    sim.day += 1
-  }
+  const since = Math.min(0.5, (performance.now() - live.receivedAt) / 1000)
+  const target = wrap(live.t + (since * live.speed) / DAY_SECONDS)
+  let diff = target - sim.t
+  if (diff > 0.5) diff -= 1
+  if (diff < -0.5) diff += 1
+  sim.t = Math.abs(diff) > 0.05 ? target : wrap(sim.t + dt / DAY_SECONDS + diff * 0.15)
+  sim.day = live.day
   const a = (sim.t - 0.25) * Math.PI * 2
   const elevation = Math.sin(a)
   sim.sunDir.set(Math.cos(a), elevation, 0.45).normalize()
   sim.night = 1 - smoothstep(-0.12, 0.14, elevation)
 }
 
-advance(0, 1)
+advance(0)
 
 export interface AgentPose {
   position: Vector3
-  yaw: number
 }
 
-/** Live world positions of every agent, read by the camera to follow one. */
+/** Smoothed on-screen agent positions, read by the camera to follow one. */
 export const poses = new Map<string, AgentPose>()

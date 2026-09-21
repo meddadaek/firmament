@@ -89,7 +89,7 @@ function Stars() {
       const y = Math.abs(u) * 0.95 + 0.02 // mostly above the horizon
       const a = rng() * Math.PI * 2
       const r = Math.sqrt(1 - y * y)
-      pos.set([Math.cos(a) * r * 85, y * 85, Math.sin(a) * r * 85], i * 3)
+      pos.set([Math.cos(a) * r * 150, y * 150, Math.sin(a) * r * 150], i * 3)
       size[i] = range(rng, 1.2, 3.4)
       phase[i] = rng()
     }
@@ -111,17 +111,17 @@ function Clouds() {
   const puffs = useMemo(() => {
     const rng = mulberry32(21)
     const list: { x: number; y: number; z: number; s: number }[] = []
-    for (let c = 0; c < 14; c++) {
-      const a = (c / 14) * Math.PI * 2 + range(rng, -0.2, 0.2)
-      const r = range(rng, 20, 34)
-      const cy = c % 3 === 0 ? range(rng, 2, 6) : range(rng, -9, -4)
+    for (let c = 0; c < 18; c++) {
+      const a = (c / 18) * Math.PI * 2 + range(rng, -0.2, 0.2)
+      const r = range(rng, 40, 62)
+      const cy = c % 3 === 0 ? range(rng, 3, 9) : range(rng, -16, -7)
       const n = 4 + Math.floor(rng() * 4)
       for (let p = 0; p < n; p++) {
         list.push({
           x: Math.cos(a) * r + range(rng, -1.8, 1.8),
           y: cy + range(rng, -0.3, 0.6),
           z: Math.sin(a) * r + range(rng, -1.8, 1.8),
-          s: range(rng, 0.9, 2.1),
+          s: range(rng, 1.6, 3.6),
         })
       }
     }
@@ -153,10 +153,10 @@ function Clouds() {
 
 export function Sky() {
   const scene = useThree((s) => s.scene)
-  const dome = useMemo(() => new SphereGeometry(95, 32, 20), [])
+  const dome = useMemo(() => new SphereGeometry(170, 32, 20), [])
 
   useLayoutEffect(() => {
-    scene.fog = new Fog('#d3ecff', 38, 120)
+    scene.fog = new Fog('#d3ecff', 75, 230)
     return () => {
       scene.fog = null
     }

@@ -18,13 +18,11 @@ import {
 } from 'three'
 import { mulberry32 } from '@/lib/random'
 import { sim } from '@/state/sim'
-import { WORLD } from './generate'
 
 const EMBERS = 28
 
 /** The firm's starting point: a fire, and a crate of starter supplies. */
-export function Campfire() {
-  const h = WORLD.tiles[WORLD.lookup.get('0,0')!].h
+export function Campfire({ height: h }: { height: number }) {
   const flames = useRef<Group>(null)
   const light = useRef<PointLight>(null)
   const embers = useRef<Points>(null)

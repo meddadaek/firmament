@@ -23,7 +23,7 @@ export function Lighting() {
     if (!l || !h) return
     const up = sim.sunDir.y >= 0
     const sign = up ? 1 : -1
-    l.position.set(sim.sunDir.x * 30 * sign, sim.sunDir.y * 30 * sign, sim.sunDir.z * 30 * sign)
+    l.position.set(sim.sunDir.x * 50 * sign, sim.sunDir.y * 50 * sign, sim.sunDir.z * 50 * sign)
     l.color.copy(tod.sun)
     l.intensity = tod.sunI * smoothstep(0.02, 0.2, Math.abs(sim.sunDir.y))
     h.color.copy(tod.hemiSky)
@@ -40,12 +40,12 @@ export function Lighting() {
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.025}
-        shadow-camera-left={-15}
-        shadow-camera-right={15}
-        shadow-camera-top={15}
-        shadow-camera-bottom={-15}
+        shadow-camera-left={-25}
+        shadow-camera-right={25}
+        shadow-camera-top={25}
+        shadow-camera-bottom={-25}
         shadow-camera-near={1}
-        shadow-camera-far={70}
+        shadow-camera-far={120}
       />
     </>
   )

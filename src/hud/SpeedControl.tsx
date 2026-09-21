@@ -2,6 +2,7 @@ import { Pause } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { cn } from '@/lib/cn'
+import { setSpeed } from '@/net/engine'
 import { useGame, type Speed } from '@/state/store'
 
 const OPTIONS: { value: Speed; label: string }[] = [
@@ -17,7 +18,6 @@ const OPTIONS: { value: Speed; label: string }[] = [
  */
 export function SpeedControl() {
   const speed = useGame((s) => s.speed)
-  const setSpeed = useGame((s) => s.setSpeed)
   const [hovered, setHovered] = useState<Speed | null>(null)
 
   return (

@@ -7,8 +7,8 @@ import { poses } from '@/state/sim'
 import { useGame } from '@/state/store'
 
 const HOME = new Vector3(0, 0.4, 0)
-const OVERVIEW_DISTANCE = 25
-const FOLLOW_DISTANCE = 8.5
+const OVERVIEW_DISTANCE = 46
+const FOLLOW_DISTANCE = 9
 
 const goal = new Vector3()
 const before = new Vector3()
@@ -42,7 +42,7 @@ export function CameraRig() {
       s.intro = Math.min(1, s.intro + dt / 3.4)
       const e = 1 - Math.pow(1 - s.intro, 3)
       offset.copy(camera.position).sub(c.target).normalize()
-      camera.position.copy(c.target).addScaledVector(offset, 70 + (OVERVIEW_DISTANCE - 70) * e)
+      camera.position.copy(c.target).addScaledVector(offset, 120 + (OVERVIEW_DISTANCE - 120) * e)
     }
 
     const id = useGame.getState().selectedId
@@ -74,7 +74,7 @@ export function CameraRig() {
       dampingFactor={0.08}
       enablePan={false}
       minDistance={5}
-      maxDistance={44}
+      maxDistance={85}
       minPolarAngle={0.2}
       maxPolarAngle={1.52}
       autoRotateSpeed={0.35}

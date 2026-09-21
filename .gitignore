@@ -25,3 +25,8 @@ dist-ssr
 
 # Local tooling
 .claude
+
+# Python engine
+engine/.venv
+__pycache__/
+.pytest_cache/

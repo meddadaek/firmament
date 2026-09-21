@@ -14,7 +14,8 @@ export const ROLE_ICON: Record<string, LucideIcon> = {
   Scout: Compass,
 }
 
-const ACTIVITY = { idle: 'Idle', walking: 'Exploring', resting: 'Resting' } as const
+export const ACT_LABEL = { idle: 'Idle', walk: 'On the move', work: 'Working', eat: 'Eating', sleep: 'Sleeping' } as const
+const ACT_COLOR = { idle: '#ffd27a', walk: '#6ee7a8', work: '#ff9a5c', eat: '#ff7a9a', sleep: '#a9b4ff' } as const
 
 /**
  * The firm roster. Adapted from the 21st.dev "Dock": a glass bar tilted back in
@@ -64,7 +65,7 @@ function DockItem({
   onClick: () => void
 }) {
   const Icon = ROLE_ICON[agent.role]
-  const activity = useGame((s) => s.activity[agent.id] ?? 'idle')
+  const activity = useGame((s) => s.agents[agent.id]?.act ?? 'idle')
 
   return (
     <motion.button
@@ -113,12 +114,12 @@ function DockItem({
         )}
         <span
           className={cn('absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-[#0b0f24]')}
-          style={{ background: activity === 'walking' ? '#6ee7a8' : activity === 'resting' ? '#a9b4ff' : '#ffd27a' }}
-          title={ACTIVITY[activity]}
+          style={{ background: ACT_COLOR[activity] }}
+          title={ACT_LABEL[activity]}
         />
       </div>
       <span className="text-[11px] leading-none font-bold text-white">{agent.name}</span>
-      <span className="text-[9.5px] leading-none font-medium text-white/50">{ACTIVITY[activity]}</span>
+      <span className="text-[9.5px] leading-none font-medium text-white/50">{ACT_LABEL[activity]}</span>
       {active && <motion.span layoutId="dock-dot" className="mt-0.5 h-1 w-1 rounded-full" style={{ background: agent.color, boxShadow: `0 0 8px ${agent.color}` }} />}
     </motion.button>
   )

@@ -1,22 +1,32 @@
 import { create } from 'zustand'
+import type { AgentState, BuildingState, ChatMessage, GameEvent, Resource, WorldData } from '@/net/types'
 
 export type Speed = 0 | 1 | 3 | 10
-export type Activity = 'idle' | 'walking' | 'resting'
+export type EngineStatus = 'connecting' | 'live' | 'offline'
 
+/**
+ * React-facing game state, refreshed a few times per second by net/engine.ts.
+ * Per-frame values (positions, the clock) live in net/engine.ts `live` and state/sim.ts instead.
+ */
 interface GameState {
+  world: WorldData | null
+  engine: EngineStatus
   speed: Speed
-  lastSpeed: Exclude<Speed, 0>
-  setSpeed: (speed: Speed) => void
-  togglePause: () => void
+  stock: Record<Resource, number>
+  tools: number
+  discovered: number
+  totalTiles: number
+  planIndex: number
+  buildings: BuildingState[]
+  agents: Record<string, AgentState>
+  events: GameEvent[]
+  chat: ChatMessage[]
 
   selectedId: string | null
   hoveredId: string | null
   select: (id: string | null) => void
   toggleSelect: (id: string) => void
   hover: (id: string | null) => void
-
-  activity: Record<string, Activity>
-  setActivity: (id: string, activity: Activity) => void
 
   ready: boolean
   setReady: () => void
@@ -25,22 +35,24 @@ interface GameState {
 }
 
 export const useGame = create<GameState>((set, get) => ({
+  world: null,
+  engine: 'connecting',
   speed: 1,
-  lastSpeed: 1,
-  setSpeed: (speed) => set(speed === 0 ? { speed } : { speed, lastSpeed: speed }),
-  togglePause: () => {
-    const { speed, lastSpeed } = get()
-    set({ speed: speed === 0 ? lastSpeed : 0 })
-  },
+  stock: { wood: 0, stone: 0, food: 0 },
+  tools: 0,
+  discovered: 0,
+  totalTiles: 1,
+  planIndex: 0,
+  buildings: [],
+  agents: {},
+  events: [],
+  chat: [],
 
   selectedId: null,
   hoveredId: null,
   select: (id) => set({ selectedId: id }),
   toggleSelect: (id) => set({ selectedId: get().selectedId === id ? null : id }),
   hover: (id) => set({ hoveredId: id }),
-
-  activity: {},
-  setActivity: (id, activity) => set((s) => ({ activity: { ...s.activity, [id]: activity } })),
 
   ready: false,
   setReady: () => set({ ready: true }),
