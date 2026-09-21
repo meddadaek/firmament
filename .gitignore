@@ -30,3 +30,8 @@ dist-ssr
 engine/.venv
 __pycache__/
 .pytest_cache/
+
+# Python engine
+engine/.venv/
+__pycache__/
+.pytest_cache/
