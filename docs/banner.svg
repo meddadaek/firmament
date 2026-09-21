@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 380" width="1280" height="380" role="img" aria-label="Firmament: six AI agents, one floating island, zero instructions">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#070a1c"/>
+      <stop offset="0.6" stop-color="#1a1d4d"/>
+      <stop offset="1" stop-color="#3b2a66"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.74" cy="0.55" r="0.45">
+      <stop offset="0" stop-color="#8b7bff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#8b7bff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d9fbff"/>
+      <stop offset="0.5" stop-color="#9df2ff"/>
+      <stop offset="1" stop-color="#b6a9ff"/>
+    </linearGradient>
+    <linearGradient id="rock" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a6a52"/>
+      <stop offset="0.55" stop-color="#6b5058"/>
+      <stop offset="1" stop-color="#2f2645"/>
+    </linearGradient>
+    <radialGradient id="fire" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff1b8"/>
+      <stop offset="0.35" stop-color="#ffb23d"/>
+      <stop offset="1" stop-color="#ff6a1f" stop-opacity="0"/>
+    </radialGradient>
+    <polygon id="hex" points="30,0 15,26 -15,26 -30,0 -15,-26 15,-26"/>
+    <style>
+      .tw { animation: tw 3s ease-in-out infinite; }
+      .tw2 { animation: tw 4.2s ease-in-out infinite 1.1s; }
+      .tw3 { animation: tw 2.6s ease-in-out infinite 0.4s; }
+      @keyframes tw { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
+      .bob { animation: bob 6s ease-in-out infinite; }
+      .bob2 { animation: bob 7.5s ease-in-out infinite 1.5s; }
+      @keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-9px) } }
+      .blink { animation: blink 1.2s steps(2, jump-none) infinite; }
+      @keyframes blink { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
+      .fire { animation: fire 0.9s ease-in-out infinite alternate; transform-origin: 952px 200px; }
+      @keyframes fire { from { transform: scale(0.85) } to { transform: scale(1.15) } }
+      .cr { animation: tw 2.4s ease-in-out infinite; }
+      .drift { animation: drift 40s linear infinite; }
+      @keyframes drift { from { transform: translateX(0) } to { transform: translateX(-160px) } }
+    </style>
+  </defs>
+
+  <rect width="1280" height="380" fill="url(#sky)"/>
+  <rect width="1280" height="380" fill="url(#glow)"/>
+
+  <!-- stars -->
+  <g fill="#e8edff">
+    <circle class="tw" cx="60" cy="40" r="1.6"/><circle class="tw2" cx="170" cy="92" r="1.2"/><circle class="tw3" cx="250" cy="30" r="1.8"/>
+    <circle class="tw2" cx="380" cy="64" r="1.3"/><circle class="tw" cx="520" cy="24" r="1.5"/><circle class="tw3" cx="610" cy="88" r="1.1"/>
+    <circle class="tw" cx="700" cy="40" r="1.7"/><circle class="tw2" cx="820" cy="22" r="1.2"/><circle class="tw3" cx="900" cy="70" r="1.4"/>
+    <circle class="tw" cx="1030" cy="34" r="1.9"/><circle class="tw2" cx="1120" cy="80" r="1.2"/><circle class="tw3" cx="1230" cy="44" r="1.6"/>
+    <circle class="tw2" cx="40" cy="300" r="1.3"/><circle class="tw" cx="560" cy="340" r="1.2"/><circle class="tw3" cx="1250" cy="330" r="1.5"/>
+    <circle class="tw" cx="1180" cy="200" r="1.1"/><circle class="tw2" cx="660" cy="180" r="1.0"/><circle class="tw3" cx="330" cy="330" r="1.4"/>
+  </g>
+
+  <!-- drifting clouds -->
+  <g class="drift" fill="#ffffff" opacity="0.12">
+    <ellipse cx="760" cy="330" rx="90" ry="14"/><ellipse cx="820" cy="322" rx="50" ry="12"/>
+    <ellipse cx="1210" cy="300" rx="80" ry="12"/><ellipse cx="1420" cy="320" rx="90" ry="14"/>
+  </g>
+
+  <!-- title -->
+  <text x="84" y="168" font-family="'Segoe UI Black','Arial Black','Helvetica Neue',Arial,sans-serif" font-size="86" font-weight="900" letter-spacing="10" fill="url(#title)">FIRMAMENT</text>
+  <text x="88" y="212" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="16" font-weight="700" letter-spacing="3" fill="#c9d2ff" opacity="0.85">SIX AI AGENTS · ONE FLOATING ISLAND · ZERO INSTRUCTIONS</text>
+  <g font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="13" font-weight="700" letter-spacing="2">
+    <rect x="88" y="236" width="132" height="30" rx="15" fill="#9df2ff" fill-opacity="0.12" stroke="#9df2ff" stroke-opacity="0.4"/>
+    <text x="154" y="256" text-anchor="middle" fill="#9df2ff">SURVIVE</text>
+    <rect x="230" y="236" width="112" height="30" rx="15" fill="#ffd27a" fill-opacity="0.12" stroke="#ffd27a" stroke-opacity="0.4"/>
+    <text x="286" y="256" text-anchor="middle" fill="#ffd27a">BUILD</text>
+    <rect x="352" y="236" width="112" height="30" rx="15" fill="#b6a9ff" fill-opacity="0.14" stroke="#b6a9ff" stroke-opacity="0.45"/>
+    <text x="408" y="256" text-anchor="middle" fill="#c9b8ff">LEARN</text>
+  </g>
+  <text class="blink" x="88" y="322" font-family="'Consolas','JetBrains Mono',monospace" font-size="20" font-weight="700" letter-spacing="3" fill="#ffd27a">▶ PRESS START</text>
+
+  <!-- small islets -->
+  <g class="bob2">
+    <polygon points="600,286 640,286 622,316" fill="url(#rock)"/>
+    <rect x="600" y="280" width="40" height="7" rx="3" fill="#7cc56b"/>
+  </g>
+  <g class="bob2">
+    <polygon points="1180,250 1214,250 1198,276" fill="url(#rock)"/>
+    <rect x="1180" y="244" width="34" height="7" rx="3" fill="#7cc56b"/>
+  </g>
+
+  <!-- the island -->
+  <g class="bob">
+    <polygon points="800,212 1110,212 1000,352 960,368 915,346" fill="url(#rock)"/>
+    <polygon points="895,300 910,300 903,322" fill="#6b5058"/>
+    <polygon points="1040,262 1054,262 1047,284" fill="#6b5058"/>
+    <polygon class="cr" points="880,262 888,250 896,262 888,276" fill="#9df2ff"/>
+    <polygon class="cr" points="1060,238 1066,228 1072,238 1066,250" fill="#9df2ff" style="animation-delay:.8s"/>
+    <polygon class="cr" points="968,318 974,306 980,318 974,330" fill="#b6a9ff" style="animation-delay:1.4s"/>
+
+    <!-- tiles (flat-top hexes squashed for a 3/4 view) -->
+    <g transform="translate(955 178) scale(1.6 0.62)">
+      <g fill="#6a5040" transform="translate(0 30)">
+        <use href="#hex" x="-90" y="0"/><use href="#hex" x="-45" y="26"/><use href="#hex" x="0" y="52"/>
+        <use href="#hex" x="45" y="26"/><use href="#hex" x="90" y="0"/><use href="#hex" x="45" y="-26"/>
+        <use href="#hex" x="-45" y="-26"/><use href="#hex" x="0" y="0"/>
+      </g>
+      <use href="#hex" x="-90" y="0" fill="#4f9a58"/>
+      <use href="#hex" x="-45" y="-26" fill="#56a15c"/>
+      <use href="#hex" x="-45" y="26" fill="#7cc56b"/>
+      <use href="#hex" x="0" y="-52" fill="#a3a7b3"/>
+      <use href="#hex" x="0" y="0" fill="#b6d987"/>
+      <use href="#hex" x="0" y="52" fill="#86cc6f"/>
+      <use href="#hex" x="45" y="-26" fill="#9aa0ad"/>
+      <use href="#hex" x="45" y="26" fill="#3fa7d6"/>
+      <use href="#hex" x="90" y="0" fill="#8fd174"/>
+      <use href="#hex" x="90" y="-52" fill="#ecd9a0"/>
+      <use href="#hex" x="-90" y="-52" fill="#478f51"/>
+    </g>
+
+    <!-- pines -->
+    <g fill="#2f7d4a">
+      <polygon points="800,160 812,130 824,160"/><polygon points="820,150 832,118 844,150"/><polygon points="842,160 852,136 862,160"/>
+    </g>
+    <!-- hut -->
+    <rect x="1010" y="170" width="30" height="18" fill="#c89b6d"/>
+    <polygon points="1004,172 1025,150 1046,172" fill="#d9b25f"/>
+    <!-- campfire -->
+    <circle class="fire" cx="952" cy="200" r="22" fill="url(#fire)"/>
+    <circle cx="952" cy="202" r="4" fill="#fff1b8"/>
+
+    <!-- the firm -->
+    <g stroke="#0b0f24" stroke-width="2">
+      <circle cx="914" cy="188" r="7" fill="#8b7bff"/>
+      <circle cx="934" cy="218" r="7" fill="#f5b53d"/>
+      <circle cx="976" cy="222" r="7" fill="#ff7b47"/>
+      <circle cx="992" cy="192" r="7" fill="#3fc27f"/>
+      <circle cx="966" cy="170" r="7" fill="#39b9ff"/>
+      <circle cx="928" cy="160" r="7" fill="#ff5c8d"/>
+    </g>
+    <!-- a thought bubble -->
+    <g font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12" font-weight="700">
+      <rect x="1000" y="100" width="148" height="30" rx="12" fill="#ffffff"/>
+      <polygon points="1010,128 1020,128 1000,142" fill="#ffffff"/>
+      <text x="1074" y="120" text-anchor="middle" fill="#141a33">We need 12 wood 🪵</text>
+    </g>
+  </g>
+</svg>
