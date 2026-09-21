@@ -1,7 +1,9 @@
 import {
+  Brain,
   Check,
   ChevronRight,
   Compass,
+  GraduationCap,
   Hammer,
   LayoutGrid,
   Lock,
@@ -17,8 +19,9 @@ import {
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { cn } from '@/lib/cn'
-import type { BuildingState, GameEvent } from '@/net/types'
+import type { GameEvent } from '@/net/types'
 import { useGame } from '@/state/store'
+import { Learning } from './Learning'
 
 const EVENT_ICON: Record<GameEvent['kind'], [LucideIcon, string]> = {
   day: [Sun, '#ffd27a'],
@@ -29,11 +32,17 @@ const EVENT_ICON: Record<GameEvent['kind'], [LucideIcon, string]> = {
   discover: [Compass, '#9df2ff'],
   farm: [Wheat, '#f5b53d'],
   tools: [Wrench, '#ffd27a'],
+  learn: [Brain, '#c9b8ff'],
 }
 
-type Tab = 'plan' | 'log'
+type Tab = 'plan' | 'learn' | 'log'
+const TABS = [
+  ['plan', 'City', LayoutGrid],
+  ['learn', 'Learning', GraduationCap],
+  ['log', 'Log', ScrollText],
+] as const
 
-/** Right-hand panel: the city plan (tech tree progress) and the firm's event log. */
+/** Right-hand panel: the city, the learning curve, and the firm's event log. */
 export function SidePanel() {
   const [open, setOpen] = useState(() => window.innerWidth >= 1100)
   const [tab, setTab] = useState<Tab>('plan')
@@ -44,10 +53,10 @@ export function SidePanel() {
         type="button"
         onClick={() => setOpen(true)}
         className="glass pointer-events-auto flex h-11 cursor-pointer items-center gap-2 self-start rounded-2xl px-3.5 text-[12px] font-bold text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-aura/70 focus-visible:outline-none"
-        aria-label="Open the city plan and log"
+        aria-label="Open the city, learning and log panel"
       >
-        <LayoutGrid size={16} className="text-violet" />
-        City plan
+        <GraduationCap size={16} className="text-violet" />
+        City &amp; learning
       </button>
     )
   }
@@ -57,15 +66,10 @@ export function SidePanel() {
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-      className="glass pointer-events-auto flex max-h-full w-[min(310px,calc(100vw-24px))] flex-col self-start overflow-hidden rounded-3xl"
+      className="glass pointer-events-auto flex max-h-full w-[min(320px,calc(100vw-24px))] flex-col self-start overflow-hidden rounded-3xl"
     >
       <header className="flex items-center gap-1 border-b border-white/10 p-2">
-        {(
-          [
-            ['plan', 'City plan', LayoutGrid],
-            ['log', 'Firm log', ScrollText],
-          ] as const
-        ).map(([id, label, Icon]) => (
+        {TABS.map(([id, label, Icon]) => (
           <button
             key={id}
             type="button"
@@ -90,78 +94,105 @@ export function SidePanel() {
           <ChevronRight size={16} />
         </button>
       </header>
-      <div className="scroll-fade min-h-0 flex-1 overflow-y-auto p-3">{tab === 'plan' ? <CityPlan /> : <FirmLog />}</div>
+      <div className="scroll-fade min-h-0 flex-1 overflow-y-auto p-3">
+        {tab === 'plan' ? <City /> : tab === 'learn' ? <Learning /> : <FirmLog />}
+      </div>
     </motion.section>
   )
 }
 
-function CityPlan() {
+/** What stands, what is being built, and every blueprint with its cost and requirements. */
+function City() {
   const world = useGame((s) => s.world)
   const buildings = useGame((s) => s.buildings)
-  const planIndex = useGame((s) => s.planIndex)
   const stock = useGame((s) => s.stock)
+  const brain = useGame((s) => s.brain)
   if (!world) return null
   const ordered = [...buildings].sort((a, b) => a.id - b.id)
   const doneKinds = new Set(ordered.filter((b) => b.state === 'done').map((b) => b.kind))
 
   return (
-    <ol className="flex flex-col gap-1.5">
-      {world.buildOrder.map((kind, i) => {
-        const bp = world.blueprints[kind]
-        const b = ordered[i] as BuildingState | undefined
-        const locked = !b && bp.requires.some((r) => !doneKinds.has(r))
-        const isNext = !b && i === planIndex
-        const state: BuildingState['state'] | 'next' | 'locked' | 'later' = b?.state ?? (isNext ? (locked ? 'locked' : 'next') : 'later')
-        const cost = Object.entries(bp.cost)
-          .map(([k, v]) => `${v} ${k}`)
-          .join(' · ')
-        return (
-          <li
-            key={i}
-            className={cn(
-              'flex items-start gap-2.5 rounded-2xl px-2.5 py-2',
-              state === 'building' || state === 'planned' ? 'bg-white/[0.07]' : '',
-              state === 'later' ? 'opacity-45' : '',
-            )}
-          >
-            <span
-              className={cn(
-                'mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[11px] font-bold',
-                state === 'done' ? 'bg-emerald-400/20 text-emerald-300' : 'bg-white/10 text-white/70',
-              )}
-            >
-              {state === 'done' ? <Check size={13} strokeWidth={3} /> : state === 'locked' ? <Lock size={11} /> : i + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[12.5px] font-bold text-white">{bp.name}</span>
-                <span className="text-[10px] font-semibold tracking-wide text-white/45 uppercase">
-                  {state === 'done' ? 'Built' : state === 'building' ? `${Math.round(b!.progress * 100)}%` : state === 'planned' ? 'Needs materials' : state === 'next' ? 'Next' : state === 'locked' ? `Needs ${bp.requires.map((r) => world.blueprints[r].name).join(', ')}` : ''}
-                </span>
-              </div>
-              {state === 'building' && (
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-                  <motion.div className="h-full rounded-full bg-gradient-to-r from-aura to-violet" animate={{ width: `${b!.progress * 100}%` }} />
-                </div>
-              )}
-              {(state === 'planned' || state === 'next' || state === 'locked') && (
-                <div className="mt-1 flex flex-wrap gap-x-2 text-[11px] text-white/55">
-                  {Object.entries(bp.cost).map(([k, v]) => {
-                    const have = stock[k as keyof typeof stock]
-                    return (
-                      <span key={k} className={have >= (v ?? 0) ? 'text-emerald-300' : ''}>
-                        {Math.min(have, v ?? 0)}/{v} {k}
+    <div className="flex flex-col gap-3">
+      <section>
+        <h3 className="mb-1.5 text-[11px] font-bold tracking-[0.12em] text-white/60 uppercase">Built by the firm</h3>
+        {ordered.length === 0 ? (
+          <p className="rounded-2xl bg-white/[0.05] px-3 py-2 text-[11.5px] text-white/50">
+            Nothing yet. {brain.kind === 'llm' ? 'Lina decides what to build first.' : 'The first hut is next on the list.'}
+          </p>
+        ) : (
+          <ol className="flex flex-col gap-1.5">
+            {ordered.map((b) => {
+              const bp = world.blueprints[b.kind]
+              return (
+                <li key={b.id} className={cn('flex items-start gap-2.5 rounded-2xl px-2.5 py-2', b.state !== 'done' && 'bg-white/[0.07]')}>
+                  <span
+                    className={cn(
+                      'mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg',
+                      b.state === 'done' ? 'bg-emerald-400/20 text-emerald-300' : 'bg-white/10 text-white/70',
+                    )}
+                  >
+                    {b.state === 'done' ? <Check size={13} strokeWidth={3} /> : <Hammer size={12} />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[12.5px] font-bold text-white">{bp.name}</span>
+                      <span className="text-[10px] font-semibold tracking-wide text-white/45 uppercase">
+                        {b.state === 'done' ? 'Built' : b.state === 'building' ? `${Math.round(b.progress * 100)}%` : 'Needs materials'}
                       </span>
-                    )
-                  })}
+                    </div>
+                    {b.state === 'building' && (
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+                        <motion.div className="h-full rounded-full bg-gradient-to-r from-aura to-violet" animate={{ width: `${b.progress * 100}%` }} />
+                      </div>
+                    )}
+                    {b.state === 'planned' && (
+                      <div className="mt-1 flex flex-wrap gap-x-2 text-[11px] text-white/55">
+                        {Object.entries(bp.cost).map(([k, v]) => {
+                          const have = stock[k as keyof typeof stock]
+                          return (
+                            <span key={k} className={have >= (v ?? 0) ? 'text-emerald-300' : ''}>
+                              {Math.min(have, v ?? 0)}/{v} {k}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </section>
+
+      <section>
+        <h3 className="mb-1.5 text-[11px] font-bold tracking-[0.12em] text-white/60 uppercase">Blueprints</h3>
+        <ul className="flex flex-col gap-1">
+          {Object.entries(world.blueprints).map(([kind, bp]) => {
+            const missing = bp.requires.filter((r) => !doneKinds.has(r))
+            return (
+              <li key={kind} className={cn('rounded-2xl px-2.5 py-1.5', missing.length && 'opacity-55')}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-[12px] font-bold text-white">
+                    {missing.length > 0 && <Lock size={11} className="text-white/50" />}
+                    {bp.name}
+                  </span>
+                  <span className="text-[10.5px] text-white/55">
+                    {Object.entries(bp.cost)
+                      .map(([k, v]) => `${v} ${k}`)
+                      .join(' · ')}
+                  </span>
                 </div>
-              )}
-              {state === 'later' && <div className="mt-0.5 text-[11px] text-white/55">{cost}</div>}
-            </div>
-          </li>
-        )
-      })}
-    </ol>
+                <p className="text-[10.5px] leading-snug text-white/45">
+                  {missing.length ? `Needs ${missing.map((r) => world.blueprints[r].name).join(', ')} first. ` : ''}
+                  {bp.summary}
+                </p>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+    </div>
   )
 }
 
@@ -174,13 +205,7 @@ function FirmLog() {
         {recent.map((e) => {
           const [Icon, tint] = EVENT_ICON[e.kind] ?? [ScrollText, '#ffffff']
           return (
-            <motion.li
-              key={e.id}
-              layout
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-start gap-2.5 rounded-xl px-2 py-1.5"
-            >
+            <motion.li key={e.id} layout initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-start gap-2.5 rounded-xl px-2 py-1.5">
               <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg" style={{ background: `${tint}1f`, color: tint }}>
                 <Icon size={13} />
               </span>

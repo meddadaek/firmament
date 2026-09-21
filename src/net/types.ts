@@ -55,7 +55,7 @@ export interface WorldData {
   brain: string
 }
 
-export type Act = 'idle' | 'walk' | 'work' | 'eat' | 'sleep'
+export type Act = 'idle' | 'walk' | 'work' | 'eat' | 'sleep' | 'think'
 
 export interface AgentState {
   id: string
@@ -73,6 +73,8 @@ export interface AgentState {
   jobs: number
   stats: { wood: number; stone: number; food: number; built: number }
   task: string | null
+  thought: string
+  plan: string[]
 }
 
 export interface BuildingState {
@@ -89,7 +91,7 @@ export interface GameEvent {
   id: number
   day: number
   time: string
-  kind: 'day' | 'night' | 'plan' | 'build' | 'done' | 'discover' | 'farm' | 'tools'
+  kind: 'day' | 'night' | 'plan' | 'build' | 'done' | 'discover' | 'farm' | 'tools' | 'learn'
   text: string
   agent: string | null
 }
@@ -101,6 +103,42 @@ export interface ChatMessage {
   from: string
   to: string | null
   text: string
+}
+
+export interface BrainStats {
+  kind: 'llm' | 'rules'
+  model: string | null
+  reflectionModel?: string
+  calls?: number
+  errors?: number
+  tokens?: number
+  avgMs?: number | null
+  status?: 'ok' | 'rate-limited' | 'quota' | 'error'
+  lastError?: string | null
+  runCalls?: number
+  decisions?: number
+  invalid?: number
+  reflections?: number
+  queue?: number
+  waiting?: boolean
+}
+
+export interface RunResult {
+  run: number
+  outcome: 'complete' | 'timeout' | 'abandoned'
+  finished: string
+  brain: string
+  townhallDay: number | null
+  days: number
+  buildings: number
+  hungrySeconds: number
+  workShare: number
+  walkShare: number
+  idleShare: number
+  wood: number
+  stone: number
+  food: number
+  calls: number
 }
 
 export interface Snapshot {
@@ -121,4 +159,7 @@ export interface Snapshot {
   revealed: number[]
   events: GameEvent[]
   chat: ChatMessage[]
+  run: { number: number; outcome: string | null; maxDays: number }
+  brain: BrainStats
+  memory?: { lessons: Record<string, string[]>; runs: RunResult[] }
 }

@@ -35,3 +35,9 @@ __pycache__/
 engine/.venv/
 __pycache__/
 .pytest_cache/
+
+# Secrets
+.env
+engine/.env
+# Runtime memory of the agents
+engine/data/

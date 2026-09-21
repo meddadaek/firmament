@@ -39,11 +39,14 @@ function Brand() {
   )
 }
 
-/** Honest status: the engine is real; the decision-making is rule-based until the LLM phase. */
+/** Honest status: which brain is deciding, and whether its calls are actually going through. */
 function EngineStatus() {
   const engine = useGame((s) => s.engine)
-  const brain = useGame((s) => s.world?.brain ?? 'rule-based')
-  const color = engine === 'live' ? 'bg-emerald-300' : engine === 'connecting' ? 'bg-sky-300' : 'bg-rose-400'
+  const brain = useGame((s) => s.brain)
+  const llm = brain.kind === 'llm'
+  const trouble = llm && (brain.status === 'error' || brain.status === 'quota')
+  const color =
+    engine !== 'live' ? (engine === 'connecting' ? 'bg-sky-300' : 'bg-rose-400') : trouble ? 'bg-rose-400' : brain.status === 'rate-limited' ? 'bg-amber-300' : 'bg-emerald-300'
   return (
     <div className="glass group pointer-events-auto relative flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5">
       <span className="relative flex h-2.5 w-2.5">
@@ -51,12 +54,38 @@ function EngineStatus() {
         <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${color}`} />
       </span>
       <div className="leading-none">
-        <div className="text-[12px] font-bold text-white">{engine === 'live' ? 'Engine live' : engine === 'connecting' ? 'Connecting…' : 'Engine offline'}</div>
-        <div className="mt-1 text-[10.5px] font-medium text-amber-200/80">{brain === 'rule-based' ? 'Rule-based brains · no AI yet' : brain}</div>
+        <div className="text-[12px] font-bold text-white">
+          {engine !== 'live' ? (engine === 'connecting' ? 'Connecting…' : 'Engine offline') : llm ? 'AI brain live' : 'Engine live'}
+        </div>
+        {llm ? (
+          <div className={`mt-1 font-mono text-[10.5px] font-medium ${trouble ? 'text-rose-300' : 'text-emerald-300/90'}`}>
+            {brain.model?.split('/').pop()} · {brain.calls ?? 0} calls{brain.avgMs ? ` · ${brain.avgMs}ms` : ''}
+          </div>
+        ) : (
+          <div className="mt-1 text-[10.5px] font-medium text-amber-200/80">Rule-based brains · no AI yet</div>
+        )}
       </div>
-      <div className="tag-pill pointer-events-none absolute top-full right-0 z-30 mt-2 w-64 rounded-xl p-3 text-[11.5px] leading-snug text-white/80 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-        The Python engine really simulates hunger, energy, resources and construction. What each agent decides to do is still a fixed rule
-        list — no language model is connected yet. That is the next phase.
+      <div className="tag-pill pointer-events-none absolute top-full right-0 z-30 mt-2 w-72 rounded-xl p-3 text-[11.5px] leading-snug text-white/80 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        {llm ? (
+          <>
+            Every decision and chat line comes from <b>{brain.model}</b> on Groq; nightly reflections use {brain.reflectionModel}.
+            <div className="mt-1.5 grid grid-cols-2 gap-x-3 font-mono text-[10.5px] text-white/65">
+              <span>calls {brain.calls ?? 0}</span>
+              <span>errors {brain.errors ?? 0}</span>
+              <span>decisions {brain.decisions ?? 0}</span>
+              <span>invalid {brain.invalid ?? 0}</span>
+              <span>reflections {brain.reflections ?? 0}</span>
+              <span>tokens {brain.tokens ?? 0}</span>
+            </div>
+            {brain.lastError && <div className="mt-1.5 text-rose-300">Last error: {brain.lastError}</div>}
+            <div className="mt-1.5 text-white/55">World time pauses while an agent waits for its answer, so API speed never counts against them.</div>
+          </>
+        ) : (
+          <>
+            The engine simulates hunger, energy, resources and construction; decisions come from a fixed rule list. Add a Groq key to
+            engine/.env to switch on the AI brain.
+          </>
+        )}
       </div>
     </div>
   )
@@ -93,6 +122,36 @@ function Loader() {
               <div className="text-xs text-white/40">{world ? 'Raising the island…' : 'Connecting to the engine…'}</div>
             )}
           </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+/** Shown while world time is paused because an agent is waiting for the model's answer. */
+function BrainWait() {
+  const waiting = useGame((s) => s.brain.waiting)
+  const status = useGame((s) => s.brain.status)
+  return (
+    <AnimatePresence>
+      {waiting && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          className="glass flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold text-violet"
+        >
+          <span className="flex gap-0.5">
+            {[0, 1, 2].map((i) => (
+              <motion.span
+                key={i}
+                className="h-1.5 w-1.5 rounded-full bg-violet"
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+              />
+            ))}
+          </span>
+          {status === 'rate-limited' ? 'Waiting for the AI rate limit · time paused' : 'Agents are thinking · time paused'}
         </motion.div>
       )}
     </AnimatePresence>
@@ -147,6 +206,7 @@ export function Hud() {
                 <SpeedControl />
               </div>
               <ResourceBar />
+              <BrainWait />
             </motion.div>
             <motion.div {...enter(1.5)}>
               <EngineStatus />

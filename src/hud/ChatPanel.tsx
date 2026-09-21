@@ -14,7 +14,7 @@ import { ROLE_ICON } from './AgentDock'
  */
 export function ChatPanel() {
   const chat = useGame((s) => s.chat)
-  const brain = useGame((s) => s.world?.brain ?? 'rule-based')
+  const brain = useGame((s) => s.brain)
   const [open, setOpen] = useState(() => window.innerWidth >= 520)
   const list = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
@@ -53,9 +53,15 @@ export function ChatPanel() {
         </div>
         <div className="min-w-0 flex-1 leading-none">
           <div className="font-display text-[13px] font-bold tracking-wide text-white">Firm chat</div>
-          <div className="mt-1 truncate text-[10.5px] font-medium text-amber-200/80" title="Lines are triggered by real events in the simulation, but the wording is scripted until the LLM brain is connected.">
-            {brain === 'rule-based' ? 'Scripted lines · AI brain not connected' : `Live · ${brain}`}
-          </div>
+          {brain.kind === 'llm' ? (
+            <div className="mt-1 truncate text-[10.5px] font-medium text-emerald-300/90" title="Every message is written by the language model as part of the agent's decision.">
+              Written live by {brain.model}
+            </div>
+          ) : (
+            <div className="mt-1 truncate text-[10.5px] font-medium text-amber-200/80" title="Lines are triggered by real events in the simulation, but the wording is scripted.">
+              Scripted lines · AI brain not connected
+            </div>
+          )}
         </div>
         <button
           type="button"

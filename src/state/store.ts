@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AgentState, BuildingState, ChatMessage, GameEvent, Resource, WorldData } from '@/net/types'
+import type { AgentState, BrainStats, BuildingState, ChatMessage, GameEvent, Resource, RunResult, WorldData } from '@/net/types'
 
 export type Speed = 0 | 1 | 3 | 10
 export type EngineStatus = 'connecting' | 'live' | 'offline'
@@ -21,6 +21,10 @@ interface GameState {
   agents: Record<string, AgentState>
   events: GameEvent[]
   chat: ChatMessage[]
+  brain: BrainStats
+  run: { number: number; outcome: string | null; maxDays: number }
+  lessons: Record<string, string[]>
+  runs: RunResult[]
 
   selectedId: string | null
   hoveredId: string | null
@@ -47,6 +51,10 @@ export const useGame = create<GameState>((set, get) => ({
   agents: {},
   events: [],
   chat: [],
+  brain: { kind: 'rules', model: null },
+  run: { number: 1, outcome: null, maxDays: 20 },
+  lessons: {},
+  runs: [],
 
   selectedId: null,
   hoveredId: null,

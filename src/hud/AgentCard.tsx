@@ -1,8 +1,11 @@
-import { Apple, BedDouble, Hammer, Package, Pickaxe, TreePine, X, Zap } from 'lucide-react'
+import { Apple, BedDouble, Brain, Hammer, ListChecks, Package, Pickaxe, TreePine, X, Zap } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { agentById } from '@/agents/roster'
 import { useGame } from '@/state/store'
 import { ROLE_ICON } from './AgentDock'
+
+// A stable empty list: a fresh [] inside a zustand selector re-renders forever.
+const NO_LESSONS: string[] = []
 
 function Need({ icon: Icon, label, value, color }: { icon: typeof Zap; label: string; value: number; color: string }) {
   const low = value < 0.3
@@ -33,6 +36,8 @@ export function AgentCard() {
     return b ? s.world?.blueprints[b.kind]?.name : undefined
   })
   const agent = agentById(selectedId)
+  const lessons = useGame((s) => (s.selectedId ? (s.lessons[s.selectedId] ?? NO_LESSONS) : NO_LESSONS))
+  const llm = useGame((s) => s.brain.kind === 'llm')
 
   return (
     <AnimatePresence mode="wait">
@@ -81,6 +86,25 @@ export function AgentCard() {
             <Need icon={Zap} label="Energy" value={state?.energy ?? 1} color="#9df2ff" />
           </div>
 
+          {llm && (
+            <div className="mx-4 mb-3 rounded-2xl bg-violet/10 px-3 py-2 ring-1 ring-violet/25">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.14em] text-violet uppercase">
+                <Brain size={12} /> {state?.act === 'think' ? 'Thinking…' : 'Last thought'}
+              </div>
+              <p className="mt-1 text-[12px] leading-snug text-white/85 italic">{state?.thought || 'No decision yet.'}</p>
+              {state && state.plan.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                  <ListChecks size={12} className="text-white/45" />
+                  {state.plan.map((p, i) => (
+                    <span key={i} className="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[10px] text-white/70">
+                      {p.replace('_', ' ')}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-4 gap-px border-t border-white/10 bg-white/10 text-center">
             {(
               [
@@ -107,6 +131,16 @@ export function AgentCard() {
               {bed ?? 'By the campfire'}
             </span>
           </div>
+          {llm && lessons.length > 0 && (
+            <details className="border-t border-white/10 px-4 py-2 text-[11.5px] text-white/70">
+              <summary className="cursor-pointer font-semibold text-white/80 select-none">Lessons learned ({lessons.length})</summary>
+              <ul className="mt-1.5 list-disc space-y-0.5 pl-4 leading-snug marker:text-white/30">
+                {lessons.map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
+            </details>
+          )}
         </motion.section>
       )}
     </AnimatePresence>

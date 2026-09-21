@@ -81,6 +81,7 @@ function apply(s: Snapshot) {
   const events = full ? s.events.slice(-MAX_FEED) : s.events.length ? [...g.events, ...s.events].slice(-MAX_FEED) : g.events
   const chat = full ? s.chat.slice(-MAX_FEED * 2) : s.chat.length ? [...g.chat, ...s.chat].slice(-MAX_FEED * 2) : g.chat
   if (s.events.length || s.chat.length || full) useGame.setState({ events, chat })
+  if (s.memory) useGame.setState({ lessons: s.memory.lessons, runs: s.memory.runs })
 
   latest = s
   const now = performance.now()
@@ -104,6 +105,8 @@ function pushHud() {
     planIndex: s.planIndex,
     buildings: s.buildings,
     agents,
+    brain: s.brain,
+    run: s.run,
   })
 }
 
@@ -112,6 +115,11 @@ export function setSpeed(value: Speed) {
   useGame.setState({ speed: value })
   live.speed = value
   if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'speed', value }))
+}
+
+/** End the current run and start the island over; the agents keep their lessons. */
+export async function newRun() {
+  await fetch('/api/run/new', { method: 'POST' })
 }
 
 export function togglePause() {

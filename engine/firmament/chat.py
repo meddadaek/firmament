@@ -27,8 +27,9 @@ def direction(x: float, z: float) -> str:
 
 
 class Chatter:
-    def __init__(self, sim: Simulation):
+    def __init__(self, sim: Simulation, scripted: bool = True):
         self.sim = sim
+        self.scripted = scripted
         self.log: deque[dict] = deque(maxlen=120)
         self.pending: list[dict] = []
         self._queue: list[tuple[float, str, str, str | None]] = []
@@ -65,6 +66,8 @@ class Chatter:
 
     # ── hooks called by the simulation ────────────────────────────────────
     def morning(self) -> None:
+        if not self.scripted:
+            return
         s = self.sim
         nxt = s.next_blueprint()
         plan = f"Next on the plan: the {s.blueprint_name(nxt)}." if nxt else "Every building on the plan is done."
@@ -73,12 +76,16 @@ class Chatter:
         self.say("sara", self._pick("I'll keep the food coming.", "Berries and crops, as usual.", "Nobody goes hungry today."), "all", 4.5)
 
     def evening(self) -> None:
+        if not self.scripted:
+            return
         self.say("lina", self._pick("It's getting dark. Everyone back to camp.", "Sun's going down, let's call it a day.", "Night's coming. Head home, everyone."), "all")
         self.say("rayan", self._pick("On my way back.", "Coming, just finishing a lap.", "Heading in."), "lina", 2.0)
         if self._ready("night-yanis", 400):
             self.say("yanis", self._pick("Tomorrow we build more.", "My back hurts. Bed.", "Good day's work."), "all", 3.5)
 
     def planned(self, by: str, kind: str, tile_xz: tuple[float, float], cost: dict[str, int]) -> None:
+        if not self.scripted:
+            return
         s = self.sim
         where = direction(*tile_xz)
         need = " and ".join(f"{v} {k}" for k, v in cost.items())
@@ -90,10 +97,14 @@ class Chatter:
             self.say("amine", self._pick("I'll handle the stone.", "Stone's on me.", "Leave the stone to me."), "all", 6.0)
 
     def construction_started(self, kind: str) -> None:
+        if not self.scripted:
+            return
         name = self.sim.blueprint_name(kind)
         self.say("yanis", self._pick(f"Materials are here. Starting on the {name}.", f"Everything's in. Building the {name} now.", f"Right, the {name}. Let's go."), "all")
 
     def completed(self, kind: str, by: str) -> None:
+        if not self.scripted:
+            return
         s = self.sim
         name = s.blueprint_name(kind)
         self.say(by, self._pick(f"The {name} is finished!", f"Done! The {name} is standing.", f"That's the {name} up."), "all")
@@ -104,10 +115,14 @@ class Chatter:
             self.say("lina", "We did it. The camp is a city now.", "all", 5.0)
 
     def beds(self, names: list[str], kind: str) -> None:
+        if not self.scripted:
+            return
         if names:
             self.say("lina", f"{', '.join(names)}: you're sleeping in the new {self.sim.blueprint_name(kind)} tonight.", "all", 4.0)
 
     def discovered(self, by: str, biome: str, xz: tuple[float, float]) -> None:
+        if not self.scripted:
+            return
         where = direction(*xz)
         what = {"stone": "a rocky hill full of stone", "forest": "a pine forest", "water": "fresh water",
                 "sand": "a sandy shore", "meadow": "wide open meadows"}.get(biome, biome)
@@ -121,27 +136,39 @@ class Chatter:
             self.say(reply[0], reply[1], by, 2.5)
 
     def explored(self, share: int) -> None:
+        if not self.scripted:
+            return
         self.say("rayan", f"I've mapped {share}% of the island.", "all")
 
     def food_low(self) -> None:
+        if not self.scripted:
+            return
         if self._ready("food-low", 200):
             self.say("sara", f"Food is getting low: {self.sim.stock['food']} left in the crate. I'm going for berries.", "all")
             self.say("yanis", "Thanks Sara, I'm starving.", "sara", 2.5)
 
     def hungry(self, agent_id: str) -> None:
+        if not self.scripted:
+            return
         if self._ready(f"hungry-{agent_id}", 300):
             self.say(agent_id, self._pick("I need to eat something.", "Stomach's growling. Food break.", "Back in a minute, I need food."), "all")
 
     def tools(self, by: str) -> None:
+        if not self.scripted:
+            return
         self.say(by, "Stone tools are ready. Everyone gathers 50% faster now.", "all")
         self.say("karim", "Finally, a real axe!", by, 2.5)
 
     def harvested(self, amount: int) -> None:
+        if not self.scripted:
+            return
         self.say("sara", f"Harvested {amount} food from the farm.", "all")
         if self._ready("harvest-reply", 300):
             self.say("rayan", "Sara, you're the best.", "sara", 2.5)
 
     def ripe(self) -> None:
+        if not self.scripted:
+            return
         if self._ready("ripe", 120):
             self.say("sara", "The crop is ripe. Harvesting soon.", "all")
 

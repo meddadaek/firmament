@@ -14,8 +14,8 @@ export const ROLE_ICON: Record<string, LucideIcon> = {
   Scout: Compass,
 }
 
-export const ACT_LABEL = { idle: 'Idle', walk: 'On the move', work: 'Working', eat: 'Eating', sleep: 'Sleeping' } as const
-const ACT_COLOR = { idle: '#ffd27a', walk: '#6ee7a8', work: '#ff9a5c', eat: '#ff7a9a', sleep: '#a9b4ff' } as const
+export const ACT_LABEL = { idle: 'Idle', walk: 'On the move', work: 'Working', eat: 'Eating', sleep: 'Sleeping', think: 'Thinking' } as const
+const ACT_COLOR = { idle: '#ffd27a', walk: '#6ee7a8', work: '#ff9a5c', eat: '#ff7a9a', sleep: '#a9b4ff', think: '#c9b8ff' } as const
 
 /**
  * The firm roster. Adapted from the 21st.dev "Dock": a glass bar tilted back in

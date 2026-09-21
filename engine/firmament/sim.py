@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import math
 import random
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from .buildings import BLUEPRINTS, BUILD_ORDER, Building
 from .chat import Chatter
+from .memory import Memory
 from .hexgrid import STEP
 from .roster import ROSTER
 from .world import World, generate_world
@@ -34,6 +36,7 @@ GATHER_RATE = {"wood": 0.22, "stone": 0.16, "food": 0.45}  # units per sim-secon
 REVEAL_RADIUS = 1
 SCOUT_REVEAL_RADIUS = 2
 START_STOCK = {"wood": 0, "stone": 0, "food": 14}
+MAX_DAYS = 20  # a run that has not built the Town Hall by then counts as failed
 
 
 def _smoothstep(a: float, b: float, x: float) -> float:
@@ -51,6 +54,7 @@ class Job:
     label: str = ""  # shown while acting
     travel: str = ""  # shown while walking
     face: tuple[float, float] | None = None  # world (x, z) to face while acting
+    started: float = 0.0  # sim clock when the job was assigned
 
 
 @dataclass
@@ -71,13 +75,21 @@ class Agent:
     job: Job | None = None
     path: list[int] = field(default_factory=list)
     seg: float = 0.0
-    act: str = "idle"  # idle | walk | work | eat | sleep
+    act: str = "idle"  # idle | walk | work | eat | sleep | think
     hidden: bool = False  # inside a building
     bed: int | None = None
     jobs_done: int = 0
     cooldown: float = 0.0
     accum: float = 0.0
     stats: dict[str, int] = field(default_factory=lambda: {"wood": 0, "stone": 0, "food": 0, "built": 0})
+    # Bookkeeping for reflection and for measuring learning.
+    time: dict[str, float] = field(default_factory=lambda: defaultdict(float))
+    day_time: dict[str, float] = field(default_factory=lambda: defaultdict(float))
+    hungry: float = 0.0
+    day_hungry: float = 0.0
+    day_log: list[str] = field(default_factory=list)
+    thought: str = ""
+    plan: list[str] = field(default_factory=list)
 
     @property
     def label(self) -> str:
@@ -94,20 +106,34 @@ class Agent:
             "carry": [self.carry_kind, self.carry_n] if self.carry_n else None,
             "hidden": self.hidden, "jobs": self.jobs_done, "stats": self.stats,
             "task": self.job.kind if self.job else None,
+            "thought": self.thought, "plan": self.plan,
         }
 
 
 class Simulation:
-    def __init__(self, seed: int = 20260921, policy=None):
+    def __init__(self, seed: int = 20260921, policy=None, memory: Memory | None = None):
         from .policy import RulePolicy
 
-        self.world: World = generate_world(seed)
+        self.seed = seed
         self.policy = policy or RulePolicy()
+        self.memory = memory or Memory(path=None)
+        self.speed = 1
+        self._setup()
+
+    @property
+    def scripted(self) -> bool:
+        return getattr(self.policy, "name", "") == "rule-based"
+
+    def _setup(self) -> None:
+        seed = self.seed
+        self.world: World = generate_world(seed)
         self.rng = random.Random(seed + 99)
+        self.run_number = len(self.memory.runs) + 1
+        self.run_outcome: str | None = None
+        self._memory_seen = -1
         self.clock = 0.0
         self.t = 0.3
         self.day = 1
-        self.speed = 1
         self.stock = dict(START_STOCK)
         self.tools = 0
         self.buildings: dict[int, Building] = {}
@@ -132,9 +158,15 @@ class Simulation:
             a.yaw = math.atan2(-t.x, -t.z)
             a.cooldown = self.rng.uniform(0.3, 3.0)
             self.agents.append(a)
-        self.chat = Chatter(self)
-        self.emit("day", "Day 1. Six founders wake up by a campfire with a crate of supplies.")
+        self.chat = Chatter(self, scripted=self.scripted)
+        self.emit("day", f"Run {self.run_number}, day 1. Six founders wake up by a campfire with a crate of supplies.")
         self.chat.morning()
+        if hasattr(self.policy, "reset"):
+            self.policy.reset(self)
+
+    def new_run(self) -> None:
+        """Start the island over. Lessons in memory (and the brain) carry over; the world does not."""
+        self._setup()
 
     def agent(self, agent_id: str) -> Agent:
         return next(a for a in self.agents if a.id == agent_id)
@@ -173,9 +205,15 @@ class Simulation:
         if bedtime and not self._bedtime:
             self.emit("night", "Night falls. The firm heads to bed.")
             self.chat.evening()
+            if hasattr(self.policy, "on_evening"):
+                self.policy.on_evening(self)
         elif not bedtime and self._bedtime:
+            for a in self.agents:
+                a.day_time, a.day_hungry, a.day_log = defaultdict(float), 0.0, []
             self.chat.morning()
         self._bedtime = bedtime
+        if self.day > MAX_DAYS and self.run_outcome is None:
+            self._end_run("timeout")
         self._update_world(dt)
         for a in self.agents:
             self._update_agent(a, dt)
@@ -215,6 +253,11 @@ class Simulation:
 
     # ── agents ────────────────────────────────────────────────────────────
     def _update_agent(self, a: Agent, dt: float) -> None:
+        a.time[a.act] += dt
+        a.day_time[a.act] += dt
+        if a.hunger < 0.2:
+            a.hungry += dt
+            a.day_hungry += dt
         sleeping = a.act == "sleep"
         a.hunger = max(0.0, a.hunger - dt / (HUNGER_DAYS * DAY_SECONDS) * (0.5 if sleeping else 1.0))
         if sleeping:
@@ -239,6 +282,7 @@ class Simulation:
             if job is None or not self._route(a, job):
                 a.cooldown = 1.5
                 return
+            job.started = self.clock
             a.job = job
 
         if a.path:
@@ -258,11 +302,21 @@ class Simulation:
 
     def _finish(self, a: Agent, productive: bool = False) -> None:
         self._release(a)
+        job = a.job
+        if job is not None and job.kind not in ("think", "sleep", "wander"):
+            took = self.clock - job.started
+            extra = f", now carrying {a.carry_n} {a.carry_kind}" if job.kind == "gather" and a.carry_n else ""
+            self.log(a, f"{job.label}{extra} ({took:.0f}s)")
         a.job = None
         a.act = "idle"
         a.accum = 0.0
         if productive:
             a.jobs_done += 1
+
+    def log(self, a: Agent, text: str) -> None:
+        """What the agent did today, in its own words: raw material for the nightly reflection."""
+        a.day_log.append(f"{self.clock_string()} {text}")
+        del a.day_log[:-40]
 
     def _snap(self, a: Agent) -> None:
         t = self.world.tiles[a.tile]
@@ -436,10 +490,16 @@ class Simulation:
             a.act = "work"
             job.work -= dt
             if job.work <= 0:
-                kind_to_build = BUILD_ORDER[self.plan_index] if self.plan_index < len(BUILD_ORDER) else None
-                if kind_to_build and self.can_plan() and job.target not in self.blocked:
+                kind_to_build = job.resource or self.next_blueprint()
+                if kind_to_build and self.can_place(kind_to_build) and job.target not in self.blocked:
                     self._place(kind_to_build, job.target, a)
                 self._finish(a, productive=True)
+
+        elif kind == "think":
+            # Standing still while the LLM decides. Finishes as soon as the answer (or an error) is back.
+            a.act = "think"
+            if self.policy.ready(a.id):
+                self._finish(a)
 
         elif kind == "craft":
             a.act = "work"
@@ -494,11 +554,14 @@ class Simulation:
     def next_blueprint(self) -> str | None:
         return BUILD_ORDER[self.plan_index] if self.plan_index < len(BUILD_ORDER) else None
 
-    def can_plan(self) -> bool:
-        kind = self.next_blueprint()
-        if kind is None or self.active_site() is not None:
+    def can_place(self, kind: str) -> bool:
+        if kind not in BLUEPRINTS or self.active_site() is not None:
             return False
         return all(self.done(req) for req in BLUEPRINTS[kind].requires)
+
+    def can_plan(self) -> bool:
+        kind = self.next_blueprint()
+        return kind is not None and self.can_place(kind)
 
     def needed(self) -> dict[str, int]:
         """Materials still missing for the active site, or for the next blueprint."""
@@ -571,6 +634,39 @@ class Simulation:
                 self.chat.beds([self._name(i) for i in b.sleepers], b.kind)
         if b.kind == "townhall":
             self.emit("done", "The Town Hall stands. The camp is officially a city.")
+            self._end_run("complete")
+
+    # ── runs (for measuring learning) ─────────────────────────────────────
+    def _end_run(self, outcome: str) -> None:
+        if self.run_outcome is not None:
+            return
+        self.run_outcome = outcome
+        total: dict[str, float] = defaultdict(float)
+        for a in self.agents:
+            for k, v in a.time.items():
+                total[k] += v
+        awake = sum(v for k, v in total.items() if k != "sleep") or 1.0
+        brain = self.policy.stats() if hasattr(self.policy, "stats") else {}
+        metrics = {
+            "run": self.run_number,
+            "outcome": outcome,
+            "finished": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "brain": brain.get("model") or getattr(self.policy, "name", "unknown"),
+            "townhallDay": self.day if outcome == "complete" else None,
+            "days": self.day,
+            "buildings": sum(1 for b in self.buildings.values() if b.state == "done"),
+            "hungrySeconds": round(sum(a.hungry for a in self.agents), 1),
+            "workShare": round(total["work"] / awake, 3),
+            "walkShare": round(total["walk"] / awake, 3),
+            "idleShare": round((total["idle"] + total["think"]) / awake, 3),
+            "wood": sum(a.stats["wood"] for a in self.agents),
+            "stone": sum(a.stats["stone"] for a in self.agents),
+            "food": sum(a.stats["food"] for a in self.agents),
+            "calls": brain.get("runCalls", 0),
+        }
+        self.memory.add_run(metrics)
+        verdict = f"Town Hall finished on day {self.day}" if outcome == "complete" else f"no Town Hall after {MAX_DAYS} days"
+        self.emit("done", f"Run {self.run_number} is over: {verdict}. Lessons are kept for the next run.")
 
     def _name(self, agent_id: str) -> str:
         return next(a.name for a in self.agents if a.id == agent_id)
@@ -590,6 +686,8 @@ class Simulation:
             "stock": dict(self.stock), "tools": self.tools,
             "discovered": len(self.discovered), "totalTiles": len(self.world.tiles),
             "planIndex": self.plan_index,
+            "run": {"number": self.run_number, "outcome": self.run_outcome, "maxDays": MAX_DAYS},
+            "brain": self.policy.stats() if hasattr(self.policy, "stats") else {"kind": "rules", "model": None},
             "agents": [a.to_json() for a in self.agents],
             "buildings": [
                 {"id": b.id, "kind": b.kind, "tile": b.tile, "state": b.state,
@@ -605,6 +703,8 @@ class Simulation:
         s["revealed"] = sorted(self.discovered)
         s["events"] = list(self.events)
         s["chat"] = list(self.chat.log)
+        s["memory"] = {"lessons": self.memory.lessons_json(), "runs": self.memory.runs}
+        self._memory_seen = self.memory.version
         return s
 
     def delta_snapshot(self) -> dict:
@@ -614,6 +714,9 @@ class Simulation:
         s["revealed"] = self._revealed
         s["events"] = self._pending_events
         s["chat"] = self.chat.drain()
+        if self.memory.version != self._memory_seen:
+            self._memory_seen = self.memory.version
+            s["memory"] = {"lessons": self.memory.lessons_json(), "runs": self.memory.runs}
         self._changed_nodes = set()
         self._revealed = []
         self._pending_events = []

@@ -97,8 +97,8 @@ def build(sim: Simulation, a: Agent, site: Building) -> Job | None:
     return Job("build", stand, site.id, label=f"building the {name}", travel=f"going to build the {name}", face=(t.x, t.z))
 
 
-def survey(sim: Simulation, a: Agent) -> Job | None:
-    kind = sim.next_blueprint()
+def survey(sim: Simulation, a: Agent, kind: str | None = None) -> Job | None:
+    kind = kind or sim.next_blueprint()
     tile = sim.pick_site(kind) if kind else None
     if tile is None:
         return None
@@ -107,7 +107,7 @@ def survey(sim: Simulation, a: Agent) -> Job | None:
         return None
     t = sim.world.tiles[tile]
     name = BLUEPRINTS[kind].name
-    return Job("survey", stand, tile, work=4.0, label=f"planning a {name}", travel="scouting a building site", face=(t.x, t.z))
+    return Job("survey", stand, tile, kind, work=4.0, label=f"planning a {name}", travel="scouting a building site", face=(t.x, t.z))
 
 
 def craft(sim: Simulation, a: Agent, workshop: Building) -> Job | None:
